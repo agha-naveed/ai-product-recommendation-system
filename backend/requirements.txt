@@ -4,3 +4,4 @@ pandas
 joblib
 pymongo
 requests
+uvicorn

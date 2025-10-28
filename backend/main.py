@@ -4,8 +4,18 @@ from sklearn.neighbors import NearestNeighbors
 import pandas as pd
 import joblib
 from bson import ObjectId
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 👈 allows all domains (good for dev)
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 client = MongoClient("mongodb://localhost:27017/")
 db = client["productDB"]
