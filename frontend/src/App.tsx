@@ -1,6 +1,8 @@
-
+import ProductList from './components/ProductList'
 export default function App() {
   return (
-    <div>App</div>
+    <div>
+      <ProductList />
+    </div>
   )
 }

@@ -3,3 +3,4 @@ scikit-learn
 pandas
 joblib
 pymongo
+requests
