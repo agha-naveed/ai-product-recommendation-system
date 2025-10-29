@@ -1,51 +1,20 @@
-import { useEffect, useState } from "react";
-import { getProducts, getRecommendations } from "../api";
-
-export default function ProductList() {
-  const [products, setProducts] = useState([]);
-  const [recs, setRecs] = useState([]);
-
-  useEffect(() => {
-    getProducts().then(setProducts);
-  }, []);
-
-  const handleClick = (id:number) => {
-    getRecommendations(id).then(setRecs);
-  };
-
+export default function ProductList({ product, onRecommend }:any) {
   return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">🛒 Products</h1>
-      <div className="grid grid-cols-4 gap-4">
-        {products.map((p:any) => (
-          <div
-            key={p._id}
-            onClick={() => handleClick(p._id)}
-            className="border rounded-lg p-2 hover:shadow-lg cursor-pointer"
-          >
-            <img src={p.image} alt={p.name} className="h-40 w-full object-contain mb-2" />
-            <h2 className="text-sm font-semibold">{p.name}</h2>
-            <p>${p.price}</p>
-            <p>⭐ {p.rating}</p>
-          </div>
-        ))}
-      </div>
-
-      {recs.length > 0 && (
-        <>
-          <h2 className="text-xl font-bold mt-6 mb-4">Recommended Products</h2>
-          <div className="grid grid-cols-4 gap-4">
-            {recs.map((r:any) => (
-              <div key={r._id} className="border rounded-lg p-2 bg-gray-100">
-                <img src={r.image} alt={r.name} className="h-40 w-full object-contain mb-2" />
-                <h2 className="text-sm font-semibold">{r.name}</h2>
-                <p>${r.price}</p>
-                <p>⭐ {r.rating}</p>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
+    <div className="bg-white shadow-md rounded-lg overflow-hidden p-3 hover:shadow-xl transition">
+      <img
+        src={product.image}
+        alt={product.title}
+        className="w-full h-40 object-contain mb-2"
+      />
+      <h3 className="text-sm font-semibold">{product.title}</h3>
+      <p className="text-gray-600 text-sm">${product.price}</p>
+      <p className="text-yellow-600 text-xs">⭐ {product.rating}</p>
+      <button
+        onClick={onRecommend}
+        className="bg-blue-500 text-white text-sm mt-2 px-3 py-1 rounded hover:bg-blue-600"
+      >
+        Recommend
+      </button>
     </div>
   );
 }
