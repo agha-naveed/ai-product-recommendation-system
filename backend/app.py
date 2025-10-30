@@ -1,15 +1,18 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
 from bson import ObjectId
-from fastapi.middleware.cors import CORSMiddleware
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.neighbors import NearestNeighbors
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from io import BytesIO
 import base64
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+
 
 app = FastAPI()
 
@@ -76,7 +79,7 @@ def recommend(user_id: str):
     liked_ids = [ObjectId(pid) for pid in user["liked_products"] if ObjectId.is_valid(pid)]
 
     # Build feature matrix from database
-    df, X = build_feature_matrix()
+    df, X, scaler, le = build_feature_matrix()
     if X is None or df.empty:
         return {"message": "No products available", "recommendations": []}
 
@@ -116,57 +119,3 @@ def recommend(user_id: str):
         "recommendations": recs
     }
 
-
-
-@app.get("/recommend/graph/{user_id}")
-def recommend_graph(user_id: str):
-    user = users_col.find_one({"user_id": user_id})
-    if not user or "liked_products" not in user or len(user["liked_products"]) == 0:
-        raise HTTPException(status_code=404, detail="No liked products yet")
-
-    liked_ids = [ObjectId(pid) for pid in user["liked_products"] if ObjectId.is_valid(pid)]
-
-    df, X_scaled, scaler, le = build_feature_matrix()
-    if df.empty:
-        raise HTTPException(status_code=404, detail="No products in DB")
-
-    # Prepare feature space (price vs rating)
-    liked_df = df[df["_id"].isin(liked_ids)]
-
-    # Get recommendations using your improved logic
-    top_category = liked_df["category"].value_counts().idxmax()
-    liked_df = liked_df[liked_df["category"] == top_category]
-    liked_vectors = X_scaled[liked_df.index]
-    user_vector = np.mean(liked_vectors, axis=0).reshape(1, -1)
-
-    knn = NearestNeighbors(metric="cosine", n_neighbors=min(10, len(df)))
-    knn.fit(X_scaled)
-    distances, indices = knn.kneighbors(user_vector)
-    recs = df.iloc[indices[0]]
-    recs = recs[~recs["_id"].isin(liked_ids)]
-
-    # --- Plot the graph ---
-    plt.figure(figsize=(8, 6))
-
-    # Plot all points
-    plt.scatter(df["price"], df["rating"], color="gray", alpha=0.4, label="All Products")
-
-    # Plot liked items
-    plt.scatter(liked_df["price"], liked_df["rating"], color="green", s=80, label="Liked Products")
-
-    # Plot recommended items
-    plt.scatter(recs["price"], recs["rating"], color="red", s=80, label="Recommended")
-
-    plt.xlabel("Price")
-    plt.ylabel("Rating")
-    plt.title(f"Recommendation Map for {user_id}")
-    plt.legend()
-
-    # Convert plot to base64 image
-    buffer = BytesIO()
-    plt.savefig(buffer, format="png")
-    buffer.seek(0)
-    image_base64 = base64.b64encode(buffer.read()).decode("utf-8")
-    buffer.close()
-
-    return {"graph": f"data:image/png;base64,{image_base64}"}

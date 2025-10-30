@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import { Link } from "react-router-dom";
 
 interface Product {
   _id: string;
@@ -10,38 +10,82 @@ interface Product {
   image: string;
 }
 
-const ProductsPage: React.FC = () => {
-  const [products, setProducts] = useState<Product[]>([]);
+const RecommendPage: React.FC = () => {
+  const [recommendations, setRecommendations] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const userId = "user123"; // you can make this dynamic later
 
   useEffect(() => {
-    axios.get("http://localhost:8000/products").then(res => setProducts(res.data));
+    const fetchRecommendations = async () => {
+      try {
+        const response = await fetch(`http://127.0.0.1:8000/recommend/${userId}`);
+        if (!response.ok) throw new Error("Failed to fetch recommendations");
+        const data = await response.json();
+        setRecommendations(data.recommendations || []);
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchRecommendations();
   }, []);
 
-  const handleAction = async (id: string, action: string) => {
-    await axios.post("http://localhost:8000/like", {
-      user_id: "user123",
-      product_id: id,
-      action,
-    });
-  };
+  if (loading) {
+    return <div className="flex justify-center items-center h-screen text-lg">Loading recommendations...</div>;
+  }
+
+  if (error) {
+    return <div className="text-center text-red-500 mt-8">⚠️ {error}</div>;
+  }
 
   return (
-    <div className="grid grid-cols-4 gap-6 p-6">
-      {products.map(p => (
-        <div key={p._id} className="border rounded-xl shadow-md p-3 hover:shadow-lg transition">
-          <img src={p.image} alt={p.title} className="h-48 w-full object-cover rounded-lg" />
-          <h3 className="text-lg font-semibold mt-2">{p.title}</h3>
-          <p className="text-sm text-gray-500">{p.category}</p>
-          <p className="font-bold">${p.price}</p>
-          <div className="flex gap-2 mt-2">
-            <button onClick={() => handleAction(p._id, "like")} className="px-3 py-1 bg-green-500 text-white rounded-lg">👍 Like</button>
-            <button onClick={() => handleAction(p._id, "dislike")} className="px-3 py-1 bg-red-500 text-white rounded-lg">👎 Dislike</button>
-            <button onClick={() => handleAction(p._id, "view")} className="px-3 py-1 bg-blue-500 text-white rounded-lg">👀 View</button>
-          </div>
+    <div className="p-6 bg-gray-100 min-h-screen">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-gray-800">✨ Recommended for You</h1>
+        <Link
+          to="/"
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-md transition"
+        >
+          ← Back to Products
+        </Link>
+      </div>
+
+      {recommendations.length === 0 ? (
+        <div className="text-center text-gray-600 mt-10">
+          <p>No personalized recommendations yet 😢</p>
+          <p className="text-sm mt-2">Try liking a few products first!</p>
         </div>
-      ))}
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {recommendations.map((product) => (
+            <div
+              key={product._id}
+              className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-transform hover:-translate-y-1 p-4"
+            >
+              <div className="h-48 flex justify-center items-center overflow-hidden mb-4">
+                <img
+                  src={product.image}
+                  alt={product.title}
+                  className="h-full object-contain rounded-lg"
+                />
+              </div>
+              <h2 className="text-lg font-semibold text-gray-800 line-clamp-2 mb-1">
+                {product.title}
+              </h2>
+              <p className="text-sm text-gray-500 mb-2">{product.category}</p>
+              <div className="flex justify-between items-center">
+                <span className="text-blue-600 font-bold">${product.price.toFixed(2)}</span>
+                <span className="text-yellow-500 text-sm">⭐ {product.rating}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
 
-export default ProductsPage;
+export default RecommendPage;
