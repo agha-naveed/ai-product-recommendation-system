@@ -1,77 +1,133 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from pymongo import MongoClient
 from bson import ObjectId
-from pydantic import BaseModel
-from typing import List
-import numpy as np
-from sklearn.preprocessing import LabelEncoder, StandardScaler
+from fastapi.middleware.cors import CORSMiddleware
+from sklearn.preprocessing import StandardScaler
 from sklearn.neighbors import NearestNeighbors
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.preprocessing import OneHotEncoder
 import pandas as pd
+import numpy as np
 
 app = FastAPI()
 
-# ========== Database ==========
+# ====== CORS ======
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ====== MongoDB ======
 client = MongoClient("mongodb://localhost:27017/")
 db = client["recommender_db"]
 products_col = db["products"]
 users_col = db["users"]
 
-# ========== Data Model ==========
-class UserAction(BaseModel):
-    user_id: str
-    product_id: str
 
-# ========== Helper: Build Product Features ==========
+# ====== Helper: Build Product Feature Matrix ======
 def build_feature_matrix():
-    products = list(products_col.find({}, {"_id": 1, "category": 1, "price": 1, "rating": 1}))
+    products = list(products_col.find({}, {"_id": 1, "title": 1, "category": 1, "price": 1, "rating": 1}))
     df = pd.DataFrame(products)
+    if df.empty:
+        return df, None, None
 
-    le = LabelEncoder()
-    df["category_encoded"] = le.fit_transform(df["category"])
+    # Fill missing values
+    df["title"] = df["title"].fillna("")
+    df["category"] = df["category"].fillna("other")
+    df["price"] = df["price"].fillna(df["price"].mean())
+    df["rating"] = df["rating"].fillna(0)
 
-    X = df[["price", "rating", "category_encoded"]].values
+    # ----- 1️⃣ One-hot encode categories -----
+    encoder = OneHotEncoder()
+    category_encoded = encoder.fit_transform(df[["category"]]).toarray()
+
+    # ----- 2️⃣ TF-IDF for titles -----
+    tfidf = TfidfVectorizer(max_features=50, stop_words="english")
+    title_tfidf = tfidf.fit_transform(df["title"])
+
+    # ----- 3️⃣ Combine all features -----
+    numeric_features = df[["price", "rating"]].values
     scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
-    return df, X_scaled, scaler, le
+    numeric_scaled = scaler.fit_transform(numeric_features)
 
-# ========== KNN Model ==========
-df, X_scaled, scaler, le = build_feature_matrix()
-knn = NearestNeighbors(metric="euclidean")
-knn.fit(X_scaled)
+    # Combine all into one large matrix
+    X = np.hstack([numeric_scaled, category_encoded, title_tfidf.toarray()])
 
-# ========== Record User Actions ==========
+    return df, X, scaler
+
+
+@app.get("/products")
+def get_products():
+    products = list(products_col.find({}, {"_id": 1, "title": 1, "price": 1, "rating": 1, "category": 1, "image": 1}))
+    for p in products:
+        p["_id"] = str(p["_id"])
+    return products
+
+
 @app.post("/view")
-def record_view(data: UserAction):
-    user = users_col.find_one({"_id": data.user_id})
-    if not user:
-        users_col.insert_one({"_id": data.user_id, "viewed_products": [data.product_id]})
-    else:
-        users_col.update_one({"_id": data.user_id}, {"$addToSet": {"viewed_products": data.product_id}})
-    return {"msg": "View recorded"}
+def add_view(data: dict):
+    user_id = data["user_id"]
+    product_id = data["product_id"]
 
-# ========== Get Personalized Recommendations ==========
+    try:
+        product = products_col.find_one({"_id": ObjectId(product_id)})
+    except:
+        return {"error": "Invalid product ID"}
+
+    if not product:
+        return {"error": "Product not found"}
+
+    users_col.update_one(
+        {"user_id": user_id},
+        {"$addToSet": {"viewed_products": str(product["_id"])}},
+        upsert=True
+    )
+
+    return {"message": "View saved", "product": product["title"]}
+
+
 @app.get("/recommend/{user_id}")
-def personalized_recommendations(user_id: str, k: int = 5):
-    user = users_col.find_one({"_id": user_id})
-    if not user or not user.get("viewed_products"):
-        raise HTTPException(404, "No user activity found")
+def recommend(user_id: str):
+    user = users_col.find_one({"user_id": user_id})
+    if not user or "viewed_products" not in user or not user["viewed_products"]:
+        return {"recommendations": []}
 
-    viewed_ids = user["viewed_products"]
-    viewed_products = list(products_col.find({"_id": {"$in": [ObjectId(pid) for pid in viewed_ids]}}))
+    last_viewed_id = user["viewed_products"][-1]
 
-    if not viewed_products:
-        raise HTTPException(404, "No viewed products found")
+    # Rebuild matrix
+    df, X, scaler = build_feature_matrix()
+    if df.empty:
+        return {"recommendations": []}
 
-    # Build user profile (average of viewed features)
-    user_df = pd.DataFrame(viewed_products)
-    user_df["category_encoded"] = le.transform(user_df["category"])
-    user_features = user_df[["price", "rating", "category_encoded"]].mean(axis=0).values
-    user_features_scaled = scaler.transform([user_features])
+    # Fit KNN
+    knn = NearestNeighbors(n_neighbors=8, metric="cosine")
+    knn.fit(X)
 
-    # Find K nearest products
-    distances, indices = knn.kneighbors(user_features_scaled, n_neighbors=k+len(viewed_ids))
-    recs = df.iloc[indices[0]]
-    recs = recs[~df["_id"].isin([ObjectId(pid) for pid in viewed_ids])]  # remove already-viewed
-    rec_products = list(products_col.find({"_id": {"$in": recs["_id"].tolist()}}))
+    # Find last viewed product
+    try:
+        target = df[df["_id"] == ObjectId(last_viewed_id)]
+    except:
+        return {"recommendations": []}
 
-    return {"user_id": user_id, "recommendations": rec_products}
+    if target.empty:
+        return {"recommendations": []}
+
+    target_index = target.index[0]
+    distances, indices = knn.kneighbors([X[target_index]])
+
+    # Collect recommended products
+    recs = df.iloc[indices[0][1:6]]  # skip the first one (same product)
+
+    # Filter out already viewed
+    viewed_ids = [ObjectId(pid) for pid in user["viewed_products"] if ObjectId.is_valid(pid)]
+    recs = recs[~recs["_id"].isin(viewed_ids)]
+
+    # Get full details
+    recs = list(products_col.find({"_id": {"$in": recs["_id"].tolist()}}))
+    for r in recs:
+        r["_id"] = str(r["_id"])
+
+    return {"recommendations": recs}
