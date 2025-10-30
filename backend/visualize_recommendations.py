@@ -1,61 +1,45 @@
-from pymongo import MongoClient
-import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
+import pandas as pd
+from pymongo import MongoClient
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.decomposition import PCA
-from sklearn.neighbors import NearestNeighbors
 
+# Connect to MongoDB
 client = MongoClient("mongodb://localhost:27017/")
 db = client["recommender_db"]
-collection = db["products"]
+products = list(db["products"].find({}, {"_id": 0}))
 
-# Load data
-products = list(collection.find({}, {"_id": 0}))
+# Convert to DataFrame
 df = pd.DataFrame(products)
 
-# Encode categories
-encoder = OneHotEncoder(sparse_output=False)
-encoded = encoder.fit_transform(df[["category"]])
-cat_df = pd.DataFrame(encoded, columns=encoder.get_feature_names_out(["category"]))
-df = pd.concat([df, cat_df], axis=1)
+# Encode categories as numbers
+le = LabelEncoder()
+df["category_encoded"] = le.fit_transform(df["category"])
 
-# Scale
-features = ["price", "rating"] + list(cat_df.columns)
+# Select numeric features
+X = df[["price", "rating", "category_encoded"]]
+
+# Normalize features
 scaler = StandardScaler()
-scaled = scaler.fit_transform(df[features])
+X_scaled = scaler.fit_transform(X)
 
-# PCA
+# Apply PCA to reduce dimensions to 2D
 pca = PCA(n_components=2)
-reduced = pca.fit_transform(scaled)
-df["pca1"], df["pca2"] = reduced[:, 0], reduced[:, 1]
+X_pca = pca.fit_transform(X_scaled)
 
-# Pick random product
-idx = np.random.randint(0, len(df))
-target = df.iloc[idx]
-same_cat = df[df["category"] == target["category"]].reset_index(drop=True)
-
-# KNN (same category)
-model = NearestNeighbors(n_neighbors=min(6, len(same_cat)), metric="cosine")
-X_same = scaled[df["category"] == target["category"]]
-model.fit(X_same)
-target_idx = same_cat[same_cat["title"] == target["title"]].index[0]
-distances, indices = model.kneighbors([X_same[target_idx]])
+df["x"] = X_pca[:, 0]
+df["y"] = X_pca[:, 1]
 
 # Plot
-plt.figure(figsize=(8,6))
-plt.scatter(same_cat["pca1"], same_cat["pca2"], c="gray", alpha=0.4)
-plt.scatter(same_cat.iloc[target_idx]["pca1"], same_cat.iloc[target_idx]["pca2"],
-            c="red", s=300, label="Target Product")
-plt.scatter(same_cat.iloc[indices[0][1:]]["pca1"], same_cat.iloc[indices[0][1:]]["pca2"],
-            c="orange", s=200, label="Recommended")
-for i in indices[0][1:]:
-    plt.text(same_cat["pca1"][i]+0.02, same_cat["pca2"][i], same_cat["title"][i][:15], fontsize=8)
-plt.title(f"🧩 KNN Recommendations for '{target['title']}'")
-plt.legend()
-plt.show()
+plt.figure(figsize=(10, 7))
+plt.scatter(df["x"], df["y"], c=df["category_encoded"], cmap="tab10", s=40, alpha=0.8)
+plt.title("Product Similarity Graph (2D PCA)")
+plt.xlabel("PCA Feature 1")
+plt.ylabel("PCA Feature 2")
 
-print(f"\n🎯 Target: {target['title']} ({target['category']})")
-print("\nRecommended Products:")
-for i in indices[0][1:]:
-    print(f"→ {same_cat.iloc[i]['title']} | Price: {same_cat.iloc[i]['price']} | Rating: {same_cat.iloc[i]['rating']}")
+# Label some points for clarity
+for i in range(0, len(df), max(1, len(df)//40)):  # label ~40 points
+    plt.text(df["x"].iloc[i], df["y"].iloc[i], df["title"].iloc[i][:15], fontsize=7)
+
+plt.colorbar(label="Category")
+plt.show()
