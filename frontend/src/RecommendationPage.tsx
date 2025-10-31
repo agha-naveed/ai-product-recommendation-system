@@ -1,4 +1,3 @@
-// frontend/src/pages/RecommendationsPage.tsx
 import React, { useEffect, useState } from "react";
 
 interface Product {
@@ -8,8 +7,7 @@ interface Product {
   price?: number;
   image?: string;
   images?: string[];
-  category?: string | { name: string };
-  rating?: number | { rate: number };
+  category?: string;
 }
 
 const RecommendationsPage: React.FC = () => {
@@ -17,35 +15,34 @@ const RecommendationsPage: React.FC = () => {
 
   useEffect(() => {
     const data = localStorage.getItem("recommendations");
-    if (data) {
-      try {
-        const parsed: Product[] = JSON.parse(data);
-        setRecs(parsed);
-      } catch (err) {
-        console.error("Error parsing recommendations:", err);
-      }
-    }
+    if (data) setRecs(JSON.parse(data));
   }, []);
 
   return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">Recommended Products</h1>
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-100 p-8">
+      <h1 className="text-4xl font-bold text-center text-gray-800 mb-10">
+        🌟 Your AI-Powered Recommendations
+      </h1>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {recs.map((p, idx) => (
+      <div className="grid gap-8 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+        {recs.map((p, i) => (
           <div
-            key={p.id ?? idx}
-            className="border p-2 rounded shadow-md hover:shadow-lg transition-shadow duration-200"
+            key={"new-"+i}
+            className="bg-white rounded-2xl shadow-lg hover:shadow-2xl overflow-hidden transform transition hover:-translate-y-1"
           >
             <img
               src={p.image || p.images?.[0]}
-              alt={p.title || p.name || "Product"}
-              className="w-full h-40 object-cover rounded"
+              alt={p.title || p.name}
+              className="w-full h-56 object-cover"
             />
-            <h2 className="text-lg font-semibold mt-2">
-              {p.title || p.name || "Untitled"}
-            </h2>
-            <p className="text-gray-600">${p.price?.toFixed(2) ?? "N/A"}</p>
+            <div className="p-4 text-center">
+              <h2 className="text-lg font-semibold text-gray-800 truncate">
+                {p.title || p.name}
+              </h2>
+              <p className="text-indigo-600 text-xl font-bold">
+                ${p.price?.toFixed(2)}
+              </p>
+            </div>
           </div>
         ))}
       </div>
