@@ -1,25 +1,32 @@
-import React from "react";
-import type { Product } from "../types/Product";
+// frontend/src/components/ProductCard.jsx
+export default function ProductCard({ product }:any) {
+  const handleRecommend = async () => {
+    const response = await fetch('http://localhost:5000/recommend', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: product.title || product.name,
+        price: product.price,
+        category: product.category?.name || product.category,
+        rating: product.rating?.rate || product.rating
+      })
+    });
+    const recs = await response.json();
+    localStorage.setItem('recommendations', JSON.stringify(recs));
+    window.location.href = '/recommendations';
+  };
 
-interface ProductCardProps {
-  product: Product;
-}
-
-const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   return (
-    <div className="border p-4 rounded-xl shadow-sm hover:shadow-lg transition">
-      <img
-        src={product.image || product.thumbnail}
-        alt={product.title}
-        className="h-32 w-full object-contain mb-3"
-      />
-      <h3 className="font-semibold">{product.title}</h3>
-      <p className="text-gray-600">${product.price}</p>
-      {product.rating && (
-        <p className="text-yellow-500 text-sm">⭐ {product.rating}</p>
-      )}
+    <div className="border p-2 shadow-md rounded">
+      <img src={product.image || product.images?.[0]} alt={product.title} className="w-full h-40 object-cover" />
+      <h2 className="text-lg font-bold mt-2">{product.title || product.name}</h2>
+      <p>${product.price}</p>
+      <button
+        onClick={handleRecommend}
+        className="mt-2 bg-blue-500 text-white px-4 py-1 rounded hover:bg-blue-600"
+      >
+        Get Recommendations
+      </button>
     </div>
   );
-};
-
-export default ProductCard;
+}

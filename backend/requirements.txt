@@ -1,9 +1,0 @@
-fastapi
-uvicorn
-motor
-pymongo
-pandas
-numpy
-scikit-learn
-joblib
-requests
