@@ -1,19 +1,12 @@
-import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
-import ProductsPage from "./components/ProductPage";
-import RecommendPage from "./components/RecommendPage";
+import React from "react";
+import Home from "./Home";
 
-export default function App() {
+const App: React.FC = () => {
   return (
-    <BrowserRouter>
-      <nav className="p-4 bg-gray-800 text-white flex gap-6">
-        <Link to="/">Products</Link>
-        <Link to="/recommend">Recommendations</Link>
-      </nav>
-
-      <Routes>
-        <Route path="/" element={<ProductsPage />} />
-        <Route path="/recommend" element={<RecommendPage />} />
-      </Routes>
-    </BrowserRouter>
+    <div className="min-h-screen bg-gray-50">
+      <Home />
+    </div>
   );
-}
+};
+
+export default App;

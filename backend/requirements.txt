@@ -1,7 +1,9 @@
 fastapi
-scikit-learn
-pandas
-joblib
-pymongo
-requests
 uvicorn
+motor
+pymongo
+pandas
+numpy
+scikit-learn
+joblib
+requests
