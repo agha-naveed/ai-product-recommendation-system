@@ -1,5 +1,7 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+# backend/main.py
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
@@ -9,16 +11,26 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.cluster import KMeans
 
-app = Flask(__name__)
-CORS(app)
+# ===============================
+#  APP INITIALIZATION
+# ===============================
+app = FastAPI(title="AI Product Recommendation API", version="1.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # ===============================
-#  LOAD DATA
+#  LOAD DATA & TRAIN MODELS
 # ===============================
 data = pd.read_csv("products.csv").dropna(subset=["price", "rating", "category"])
 data.reset_index(drop=True, inplace=True)
 
-# --- One-Hot Encode category ---
+# --- Encode category ---
 enc = OneHotEncoder(sparse_output=False)
 category_encoded = enc.fit_transform(data[["category"]])
 category_df = pd.DataFrame(category_encoded, columns=enc.get_feature_names_out(["category"]))
@@ -44,35 +56,48 @@ svm.fit(X_scaled, y)
 data["cluster"] = kmeans.fit_predict(X_scaled)
 
 # ===============================
+#  REQUEST MODEL
+# ===============================
+class ProductInput(BaseModel):
+    price: float
+    rating: float
+    category: str
+
+# ===============================
 #  ROUTES
 # ===============================
-@app.route("/products", methods=["GET"])
-def get_products():
+
+@app.get("/")
+async def root():
+    return {"message": "AI Product Recommender API is running 🚀"}
+
+
+@app.get("/products")
+async def get_products():
     """Return all products"""
-    return jsonify(data.to_dict(orient="records"))
+    return data.to_dict(orient="records")
 
 
-@app.route("/recommend", methods=["POST"])
-def recommend():
+@app.post("/recommend")
+async def recommend(item: ProductInput):
     """Hybrid AI-based recommendation with category filtering"""
-    item = request.json
-    price = item.get("price", 500)
-    rating = item.get("rating", 3)
-    category = str(item.get("category", "Electronics"))
+    price = item.price
+    rating = item.rating
+    category = item.category
 
-    # Filter only products in the same category
+    # Filter same-category data
     same_cat_data = data[data["category"].str.lower() == category.lower()]
     if same_cat_data.empty:
-        same_cat_data = data  # fallback in case category not found
+        same_cat_data = data  # fallback
 
-    # Encode only within this subset
+    # Encode within subset
     X_sub = pd.concat(
         [same_cat_data[["price", "rating"]], same_cat_data[enc.get_feature_names_out(["category"])]],
         axis=1
     )
     X_sub_scaled = scaler.transform(X_sub)
 
-    # Input encoding
+    # Input vector encoding
     cat_vector = np.zeros(len(enc.get_feature_names_out(["category"])))
     if category in enc.categories_[0]:
         idx = list(enc.categories_[0]).index(category)
@@ -83,6 +108,7 @@ def recommend():
     # ===============================
     #  MODEL PREDICTIONS
     # ===============================
+
     # 1️⃣ KNN
     knn_neighbors = knn.kneighbors(input_scaled, return_distance=False)[0]
     knn_score = {i: 1 for i in knn_neighbors if i in same_cat_data.index}
@@ -108,7 +134,7 @@ def recommend():
     cluster_score = {i: 1 for i in cluster_items}
 
     # ===============================
-    #  COMBINE RESULTS (weighted)
+    #  COMBINE RESULTS (Weighted)
     # ===============================
     combined_scores = {}
     models = [
@@ -124,7 +150,7 @@ def recommend():
             combined_scores[i] = combined_scores.get(i, 0) + score * weight
 
     # ===============================
-    #  GET FINAL TOP PRODUCTS
+    #  FINAL TOP RECOMMENDATIONS
     # ===============================
     if not combined_scores:
         recs = same_cat_data.sample(min(5, len(same_cat_data))).to_dict(orient="records")
@@ -132,8 +158,4 @@ def recommend():
         top_indexes = sorted(combined_scores, key=combined_scores.get, reverse=True)[:5]
         recs = data.loc[top_indexes].to_dict(orient="records")
 
-    return jsonify(recs)
-
-
-if __name__ == "__main__":
-    app.run(port=5000, debug=True)
+    return recs

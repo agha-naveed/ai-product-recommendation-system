@@ -1,7 +1,7 @@
 // frontend/src/components/ProductCard.jsx
 export default function ProductCard({ product }:any) {
   const handleRecommend = async () => {
-    const response = await fetch('http://localhost:5000/recommend', {
+    const response = await fetch('http://localhost:8000/recommend', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

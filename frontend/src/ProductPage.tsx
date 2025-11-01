@@ -17,7 +17,7 @@ const ProductsPage: React.FC = () => {
 
   useEffect(() => {
     const fetchProducts = async () => {
-      const res = await axios.get("http://localhost:5000/products");
+      const res = await axios.get("http://localhost:8000/products");
       setProducts(res.data);
     };
     fetchProducts();
@@ -32,7 +32,7 @@ const ProductsPage: React.FC = () => {
           ? p.category.name
           : p.category ?? "Electronics",
     };
-    const res = await axios.post("http://localhost:5000/recommend", payload);
+    const res = await axios.post("http://localhost:8000/recommend", payload);
     localStorage.setItem("recommendations", JSON.stringify(res.data));
     window.location.href = "/recommendations";
   };
