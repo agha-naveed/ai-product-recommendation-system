@@ -6,6 +6,7 @@ interface Product {
   name?: string;
   price?: number;
   image?: string;
+  rating?: number;
   images?: string[];
   category?: string;
 }
@@ -39,6 +40,9 @@ const RecommendationsPage: React.FC = () => {
               <h2 className="text-lg font-semibold text-gray-800 truncate">
                 {p.title || p.name}
               </h2>
+              <p className="text-gray-600 flex items-center justify-center">
+                rating: {p.rating}
+              </p>
               <p className="text-indigo-600 text-xl font-bold">
                 ${p.price?.toFixed(2)}
               </p>
