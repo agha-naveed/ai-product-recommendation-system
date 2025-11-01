@@ -38,7 +38,7 @@ const ProductsPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 p-6">
+    <div className="min-h-screen from-gray-50 to-gray-200 p-6">
       <h1 className="text-4xl font-extrabold text-gray-800 mb-8 text-center tracking-tight">
         🛍️ AI Product Explorer
       </h1>
@@ -47,7 +47,7 @@ const ProductsPage: React.FC = () => {
         {products.map((p, i) => (
           <div
             key={"products-"+i}
-            className="group bg-white rounded-2xl shadow hover:shadow-2xl transition transform hover:-translate-y-1 overflow-hidden cursor-pointer"
+            className="group bg-white rounded-2xl shadow hover:shadow-2xl transition transform hover:-translate-y-1 overflow-hidden p-4 cursor-pointer"
             onClick={() => handleRecommend(p)}
           >
             <img
@@ -55,7 +55,7 @@ const ProductsPage: React.FC = () => {
               alt={p.title || p.name || "Product"}
               className="w-full h-56 object-cover group-hover:scale-105 transition-transform duration-300"
             />
-            <div className="p-4">
+            <div className="py-4">
               <h2 className="text-lg font-semibold truncate text-gray-900">
                 {p.title || p.name}
               </h2>
