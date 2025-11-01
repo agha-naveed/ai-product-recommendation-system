@@ -1,5 +1,10 @@
+import { useNavigate } from "react-router-dom";
+
 // frontend/src/components/ProductCard.jsx
 export default function ProductCard({ product }:any) {
+
+  const navigate = useNavigate()
+
   const handleRecommend = async () => {
     const response = await fetch('http://localhost:8000/recommend', {
       method: 'POST',
@@ -13,7 +18,7 @@ export default function ProductCard({ product }:any) {
     });
     const recs = await response.json();
     localStorage.setItem('recommendations', JSON.stringify(recs));
-    window.location.href = '/recommendations';
+    navigate('/recommendations');
   };
 
   return (

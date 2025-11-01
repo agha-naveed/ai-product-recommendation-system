@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
 interface Product {
   id?: number;
@@ -14,7 +15,7 @@ interface Product {
 
 const ProductsPage: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
-
+  const navigate = useNavigate()
   useEffect(() => {
     const fetchProducts = async () => {
       const res = await axios.get("http://localhost:8000/products");
@@ -34,7 +35,7 @@ const ProductsPage: React.FC = () => {
     };
     const res = await axios.post("http://localhost:8000/recommend", payload);
     localStorage.setItem("recommendations", JSON.stringify(res.data));
-    window.location.href = "/recommendations";
+    navigate("/recommendations")
   };
 
   return (
