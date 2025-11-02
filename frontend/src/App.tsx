@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import ProductsPage from "./ProductPage";
-import RecommendationsPage from "./RecommendationPage";
+import ProductsPage from "./pages/ProductPage";
+import RecommendationsPage from "./pages/RecommendationPage";
 
 const App = () => (
   <BrowserRouter>
